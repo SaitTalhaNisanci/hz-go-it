@@ -18,13 +18,6 @@ pipeline {
             }
         }
 
-        stage('Deploy Cluster') {
-            steps {
-                git changelog: false, poll: false, url: 'https://github.com/lazerion/hz-go-it.git'
-                sh "docker-compose -f deployment.yaml up -d"
-            }
-        }
-
         stage('Acceptance') {
             steps {
                 sh "go test"
