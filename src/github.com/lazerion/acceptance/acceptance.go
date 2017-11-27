@@ -13,6 +13,7 @@ import (
 	"testing"
 	"github.com/hazelcast/go-client/config"
 	"github.com/hazelcast/go-client/core"
+	"github.com/lucasjones/reggen"
 	"time"
 )
 
@@ -63,7 +64,7 @@ func (flow AcceptanceFlow) Project() AcceptanceFlow {
 	}, nil)
 
 	if err != nil && flow.options.ImmediateFail {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	flow.project = project
@@ -74,7 +75,7 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 	name := flow.options.ProjectName
 	err := flow.project.Up(context.Background(), options.Up{}, name)
 	if err != nil && flow.options.ImmediateFail {
-		log.Fatal(err)
+		panic(err)
 	}
 	//// todo improve wait on event
 	time.Sleep(5 * time.Second)
@@ -95,20 +96,23 @@ func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 func (flow AcceptanceFlow) Down() AcceptanceFlow {
 	err := flow.project.Down(context.Background(), options.Down{})
 	if err != nil && flow.options.ImmediateFail {
-		log.Fatal(err)
+		panic(err)
 	}
 	return flow
 }
 
 func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
-	return flow.Client(hazelcast.NewHazelcastConfig())
+	var clientConfig = hazelcast.NewHazelcastConfig()
+	clientConfig.ClientNetworkConfig().SetConnectionAttemptLimit(5)
+	clientConfig.ClientNetworkConfig().SetConnectionTimeout(2)
+	return flow.Client(clientConfig)
 }
 
 func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
 	client, err := hazelcast.NewHazelcastClientWithConfig(config)
 	if err != nil && flow.options.ImmediateFail {
 		flow.Down()
-		log.Fatal(err)
+		panic(err)
 	}
 
 	members := client.GetCluster().GetMemberList()
@@ -122,7 +126,7 @@ func (flow AcceptanceFlow) TryMap(t *testing.T, args ...int) AcceptanceFlow {
 	mp, err := flow.client.GetMap(map_name)
 	if err != nil {
 		flow.Down()
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	size, _ := mp.Size()
@@ -171,7 +175,7 @@ func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
 
 	_, err := flow.createdMap.Put(key, value)
 	if err == nil {
-		log.Fatal("Error expected!")
+		t.Fatal("Error expected!")
 	} else {
 		log.Printf("Error is %v", err)
 	}
@@ -182,5 +186,59 @@ func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
 func (flow AcceptanceFlow) ExpectConnection(t *testing.T, expected int) AcceptanceFlow {
 	members := flow.client.GetCluster().GetMemberList()
 	assert.Equal(t, len(members), expected)
+	return flow
+}
+
+func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
+
+	const keyRegex =  "[a-z]{42}"
+	const valueRegex =  "[0-9]{42}"
+
+	keyGen, err := reggen.NewGenerator(keyRegex)
+	if err != nil {
+		t.Fatalf("Regex generator error %v", err)
+	}
+
+	valueGen, err := reggen.NewGenerator(valueRegex)
+	if err != nil {
+		t.Fatalf("Regex generator error %v", err)
+	}
+
+	const size = 1024
+
+	keys :=  make([]string, size)
+	values :=  make([]string, size)
+
+	for i := 0; i < size; i++ {
+		keys[i] = keyGen.Generate(42)
+		values[i] = valueGen.Generate(42)
+		flow.createdMap.Put(keys[i], values[i])
+	}
+
+	s, _ := flow.createdMap.Size()
+	assert.Equal(t, s, int32(size))
+
+	entrySet, err := flow.createdMap.EntrySetWithPredicate(core.Regex("this", valueRegex))
+	if err != nil {
+		t.Fatalf("Predicate error %v", err)
+	}
+	assert.Equal(t, size, len(entrySet))
+
+	actualValues, err := flow.createdMap.ValuesWithPredicate(core.Regex("this", valueRegex))
+	if err != nil {
+		t.Fatalf("Predicate error %v", err)
+	}
+	assert.Equal(t, size, len(actualValues))
+	assert.Subsetf(t, values, actualValues, "Fails value check")
+
+	//TODO below fails. inform client team
+	//keySet, err := flow.createdMap.KeySetWithPredicate(core.Regex("this", keyRegex))
+	//if err != nil {
+	//	t.Fatalf("Predicate error %v", err)
+	//}
+	//assert.Equal(t, len(keySet), size)
+
+	flow.createdMap.Clear()
+
 	return flow
 }

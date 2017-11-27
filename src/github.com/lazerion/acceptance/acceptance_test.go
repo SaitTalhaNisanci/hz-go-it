@@ -48,4 +48,14 @@ func TestBasicMapOperations(t *testing.T) {
 	flow.Project().Up().DefaultClient().TryMap(t, 1024, 1024).Down()
 }
 
+/**
+Predicate
+Case 1 - Basic Map Get/Put/Delete
+ */
+func TestPredicate(t *testing.T) {
+	flow := NewFlow()
+	flow.Project().Up().DefaultClient().TryMap(t).Predicate(t).Down()
+}
+
+
 
