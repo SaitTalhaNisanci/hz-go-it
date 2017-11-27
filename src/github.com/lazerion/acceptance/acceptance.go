@@ -185,24 +185,18 @@ func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
 
 func (flow AcceptanceFlow) ExpectConnection(t *testing.T, expected int) AcceptanceFlow {
 	members := flow.client.GetCluster().GetMemberList()
-	assert.Equal(t, len(members), expected)
+	assert.Equal(t, expected, len(members))
 	return flow
 }
 
 func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
+	s, _  := flow.createdMap.Size(); if s > 0 {flow.createdMap.Clear()}
 
 	const keyRegex =  "[a-z]{42}"
 	const valueRegex =  "[0-9]{42}"
 
-	keyGen, err := reggen.NewGenerator(keyRegex)
-	if err != nil {
-		t.Fatalf("Regex generator error %v", err)
-	}
-
+	keyGen, _ := reggen.NewGenerator(keyRegex)
 	valueGen, err := reggen.NewGenerator(valueRegex)
-	if err != nil {
-		t.Fatalf("Regex generator error %v", err)
-	}
 
 	const size = 1024
 
@@ -215,7 +209,7 @@ func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
 		flow.createdMap.Put(keys[i], values[i])
 	}
 
-	s, _ := flow.createdMap.Size()
+	s, _ = flow.createdMap.Size()
 	assert.Equal(t, s, int32(size))
 
 	entrySet, err := flow.createdMap.EntrySetWithPredicate(core.Regex("this", valueRegex))
