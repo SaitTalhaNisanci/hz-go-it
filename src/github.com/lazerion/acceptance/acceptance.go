@@ -33,6 +33,7 @@ type AcceptanceFlow struct {
 	options Options
 	project project.APIProject
 	client  hazelcast.IHazelcastInstance
+	context project.Context
 }
 
 func NewFlow() AcceptanceFlow {
@@ -43,11 +44,13 @@ func NewFlow() AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) Project(f string) AcceptanceFlow {
+	flow.context = project.Context{
+		ComposeFiles: []string{f},
+		ProjectName:  flow.options.ProjectName,
+	}
+
 	project, err := docker.NewProject(&ctx.Context{
-		Context: project.Context{
-			ComposeFiles: []string{f},
-			ProjectName:  flow.options.ProjectName,
-		},
+		Context: flow.context,
 	}, nil)
 
 	if err != nil && flow.options.ImmediateFail {
@@ -65,7 +68,18 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 		log.Fatal(err)
 	}
 	// todo improve wait on event
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
+	return flow
+}
+
+func (flow AcceptanceFlow) Scale() AcceptanceFlow {
+
+	m := make(map[string]int)
+	m[flow.options.ProjectName] = 3
+	flow.project.Scale(context.Background(), 10000, m)
+
+	// todo improve wait on event
+	//time.Sleep(10 * time.Second)
 	return flow
 }
 
@@ -85,6 +99,8 @@ func (flow AcceptanceFlow) Client() AcceptanceFlow {
 		log.Fatal(err)
 	}
 
+	members := client.GetCluster().GetMemberList()
+	log.Printf("Number of members : %v", len(members))
 	flow.client = client
 	return flow
 }

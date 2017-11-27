@@ -2,7 +2,5 @@
 #services:
 hazelcast:
   image: hazelcast/hazelcast:3.9
-#  deploy:
-#    replicas: 1
   ports:
     - "5701:5701"
