@@ -4,6 +4,7 @@ import (
 	"testing"
 	"github.com/hazelcast/go-client"
 	"sync"
+	"github.com/lucasjones/reggen"
 )
 
 func TestSingleMemberConnection(t *testing.T) {
@@ -14,6 +15,21 @@ func TestSingleMemberConnection(t *testing.T) {
 func TestClusterDiscovery(t *testing.T) {
 	flow := NewFlow()
 	flow.Project().Up().Scale(Scaling{Count:1}).DefaultClient().TryMap(t).Down()
+}
+
+func TestClusterAuthenticationWithWrongCredentials(t *testing.T) {
+	flow := NewFlow()
+
+	name, _ := reggen.Generate("[a-z]42", 42)
+	password, _ := reggen.Generate("[a-z]42", 42)
+
+	config := hazelcast.NewHazelcastConfig()
+	config.GroupConfig().SetName(name)
+	config.GroupConfig().SetPassword(password)
+
+	flow.options.ImmediateFail = false
+
+	flow.Project().Up().Client(config).ExpectError(t).Down()
 }
 
 /**

@@ -180,7 +180,14 @@ func countAndSize(args ...int) (int, int) {
 }
 
 func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
-	assert.NotNil(t, flow.createdMap)
+	if flow.createdMap == nil {
+		var err error
+		name, _  := reggen.Generate("[a-z]42", 42)
+		flow.createdMap, err = flow.client.GetMap(name); if err != nil {
+			log.Printf("Error is %v", err)
+			return flow
+		}
+	}
 
 	key := randSeq(42)
 	value := randSeq(42)
