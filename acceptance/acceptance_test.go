@@ -57,5 +57,20 @@ func TestPredicate(t *testing.T) {
 	flow.Project().Up().DefaultClient().TryMap(t).Predicate(t).Down()
 }
 
+/**
+Entry processor
+Case 1 - Basic Map Get/Put/Delete
+ */
+func TestEntryProcessor(t *testing.T) {
+	flow := NewFlow()
+	config := hazelcast.NewHazelcastConfig()
+	expected := "test"
+	processor := CreateEntryProcessor(expected)
+
+	config.SerializationConfig().AddDataSerializableFactory(processor.identifiedFactory.factoryId, processor.identifiedFactory)
+	flow.Project().Up().Client(config).TryMap(t).EntryProcessor(t, expected, processor).Down()
+}
+
+
 
 

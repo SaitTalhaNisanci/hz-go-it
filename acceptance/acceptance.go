@@ -43,6 +43,7 @@ type AcceptanceFlow struct {
 	client     hazelcast.IHazelcastInstance
 	context    project.Context
 	createdMap core.IMap
+	config     *config.ClientConfig
 }
 
 func NewFlow() AcceptanceFlow {
@@ -94,6 +95,7 @@ func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) Down() AcceptanceFlow {
+	//todo check cluster size
 	err := flow.project.Down(context.Background(), options.Down{})
 	if err != nil && flow.options.ImmediateFail {
 		panic(err)
@@ -118,6 +120,7 @@ func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
 	members := client.GetCluster().GetMemberList()
 	log.Printf("Number of members : %v", len(members))
 	flow.client = client
+	flow.config = config
 	return flow
 }
 
@@ -164,7 +167,7 @@ func countAndSize(args ...int) (int, int) {
 	if len(args) > 1 {
 		return args[0], args[1]
 	}
-	return 1,1
+	return 1, 1
 }
 
 func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
@@ -175,6 +178,7 @@ func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
 
 	_, err := flow.createdMap.Put(key, value)
 	if err == nil {
+		flow.Down()
 		t.Fatal("Error expected!")
 	} else {
 		log.Printf("Error is %v", err)
@@ -190,18 +194,20 @@ func (flow AcceptanceFlow) ExpectConnection(t *testing.T, expected int) Acceptan
 }
 
 func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
-	s, _  := flow.createdMap.Size(); if s > 0 {flow.createdMap.Clear()}
+	s, _ := flow.createdMap.Size(); if s > 0 {
+		flow.createdMap.Clear()
+	}
 
-	const keyRegex =  "[a-z]{42}"
-	const valueRegex =  "[0-9]{42}"
+	const keyRegex = "[a-z]{42}"
+	const valueRegex = "[0-9]{42}"
 
 	keyGen, _ := reggen.NewGenerator(keyRegex)
 	valueGen, err := reggen.NewGenerator(valueRegex)
 
 	const size = 1024
 
-	keys :=  make([]string, size)
-	values :=  make([]string, size)
+	keys := make([]string, size)
+	values := make([]string, size)
 
 	for i := 0; i < size; i++ {
 		keys[i] = keyGen.Generate(42)
@@ -214,6 +220,7 @@ func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
 
 	entrySet, err := flow.createdMap.EntrySetWithPredicate(core.Regex("this", valueRegex))
 	if err != nil {
+		flow.Down()
 		t.Fatalf("Predicate error %v", err)
 	}
 	assert.Equal(t, size, len(entrySet))
@@ -225,14 +232,35 @@ func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
 	assert.Equal(t, size, len(actualValues))
 	assert.Subsetf(t, values, actualValues, "Fails value check")
 
-	//TODO below fails. inform client team
-	//keySet, err := flow.createdMap.KeySetWithPredicate(core.Regex("this", keyRegex))
-	//if err != nil {
-	//	t.Fatalf("Predicate error %v", err)
-	//}
-	//assert.Equal(t, len(keySet), size)
+	//TODO below fails. inform go-client team
+	keySet, err := flow.createdMap.KeySetWithPredicate(core.Regex("this", keyRegex))
+	if err != nil {
+		flow.Down()
+		t.Fatalf("Predicate error %v", err)
+	}
+	assert.Equal(t, len(keySet), size)
 
 	flow.createdMap.Clear()
 
+	return flow
+}
+
+func (flow AcceptanceFlow) EntryProcessor(t *testing.T, expected string, processor *EntryProcessor) AcceptanceFlow {
+	key, _ := reggen.Generate("^[a-z]", 42)
+	val, _ := reggen.Generate("^[0-9]", 1024)
+
+	_, err := flow.createdMap.Put(key, val); if err != nil {
+		flow.Down()
+		t.Fatal(err)
+	}
+
+	actual, err := flow.createdMap.ExecuteOnKey(key, processor); if err != nil {
+		flow.Down()
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, expected, actual)
+
+	flow.createdMap.Clear()
 	return flow
 }

@@ -2,7 +2,8 @@
 
 git clone https://github.com/lazerion/hz-go-it
 ls -al
-cd ./src/github.com/lazerion/acceptance/
+cd ./acceptance/
+go get -u all
 go build
 go test
 rc=$?
