@@ -8,5 +8,5 @@ go build
 go test
 rc=$?
 if [[ ${rc} -ne 0 ]] ; then
-  echo 'could not perform tests'; exit $rc
+  echo 'could not perform tests with success'; exit $rc
 fi

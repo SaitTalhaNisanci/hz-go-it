@@ -3,6 +3,7 @@ package acceptance
 import (
 	"testing"
 	"github.com/hazelcast/go-client"
+	"sync"
 )
 
 func TestSingleMemberConnection(t *testing.T) {
@@ -70,6 +71,49 @@ func TestEntryProcessor(t *testing.T) {
 	config.SerializationConfig().AddDataSerializableFactory(processor.identifiedFactory.factoryId, processor.identifiedFactory)
 	flow.Project().Up().Client(config).TryMap(t).EntryProcessor(t, expected, processor).Down()
 }
+
+/**
+Cluster/Lifecycle Service
+Case 4 - Lifecycle When Scale UP
+ */
+func TestWhenClusterScaleUp(t *testing.T) {
+	flow := NewFlow()
+
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+	wg.Add(10)
+	config := hazelcast.NewHazelcastConfig()
+	listener := LifeCycleListener{wg: wg, collector: make([]string, 0)}
+	config.AddLifecycleListener(&listener)
+	config.ClientNetworkConfig().SetConnectionAttemptLimit(5)
+
+	flow.Project().Up().Client(config).TryMap(t).ExpectConnect(t, wg, listener).Down()
+}
+
+/**
+Cluster/Lifecycle Service
+Case 3 - Lifecycle When Scale DOWN
+ */
+func TestWhenClusterScaleDown(t *testing.T) {
+	flow := NewFlow()
+
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+	wg.Add(10)
+	config := hazelcast.NewHazelcastConfig()
+	listener := LifeCycleListener{wg: wg, collector: make([]string, 0)}
+	config.AddLifecycleListener(&listener)
+	config.ClientNetworkConfig().SetConnectionAttemptLimit(1)
+
+	flow.Project().Up().Client(config).TryMap(t).Down().ExpectDisconnect(t, wg, listener)
+}
+
+/**
+Performance Tests
+Case 1 - Basic Map Operations
+ */
+func TestBasicMapOperationsPerformance(t *testing.T) {
+	//TODO Complete
+}
+
 
 
 

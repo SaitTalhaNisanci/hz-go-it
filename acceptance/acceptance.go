@@ -15,10 +15,12 @@ import (
 	"github.com/hazelcast/go-client/core"
 	"github.com/lucasjones/reggen"
 	"time"
+	"sync"
 )
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
+//todo replace with reggen
 func randSeq(n int) string {
 	b := make([]rune, n)
 	for i := range b {
@@ -79,7 +81,7 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 		panic(err)
 	}
 	//// todo improve wait on event
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 	return flow
 }
 
@@ -262,5 +264,48 @@ func (flow AcceptanceFlow) EntryProcessor(t *testing.T, expected string, process
 	assert.Equal(t, expected, actual)
 
 	flow.createdMap.Clear()
+	return flow
+}
+
+type LifeCycleListener struct {
+	wg        *sync.WaitGroup
+	collector []string
+}
+
+func (listener *LifeCycleListener) LifecycleStateChanged(newState string) {
+	listener.collector = append(listener.collector, newState)
+	listener.wg.Done()
+}
+
+func WaitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
+func (flow AcceptanceFlow) ExpectConnect(t *testing.T, wg *sync.WaitGroup, listener LifeCycleListener) AcceptanceFlow {
+	WaitTimeout(wg, 5000)
+
+	msg := listener.collector[len(listener.collector) - 1]
+	log.Print(msg)
+	assert.NotEmpty(t, msg)
+	assert.Contains(t, msg, "STARTED")
+	return flow
+}
+
+func (flow AcceptanceFlow) ExpectDisconnect(t *testing.T, wg *sync.WaitGroup, listener LifeCycleListener) AcceptanceFlow {
+	WaitTimeout(wg, 5000)
+
+	msg := listener.collector[len(listener.collector) - 1]
+	assert.NotEmpty(t, msg)
+	assert.Contains(t, msg, "DISCONNECTED")
 	return flow
 }

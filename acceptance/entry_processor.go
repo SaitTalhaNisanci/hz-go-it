@@ -1,7 +1,6 @@
 package acceptance
 
 import (
-	_ "github.com/hazelcast/go-client/serialization"
 	"github.com/hazelcast/go-client/serialization"
 )
 
