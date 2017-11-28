@@ -109,9 +109,11 @@ func TestWhenClusterScaleDown(t *testing.T) {
 /**
 Performance Tests
 Case 1 - Basic Map Operations
+Note: current 95 percentile is slightly above 2 ms
  */
 func TestBasicMapOperationsPerformance(t *testing.T) {
-	//TODO Complete
+	flow := NewFlow()
+	flow.Project().Up().DefaultClient().TryMap(t, 1024, 1024).Percentile(t, 3).Down()
 }
 
 

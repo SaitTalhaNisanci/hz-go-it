@@ -16,6 +16,7 @@ import (
 	"github.com/lucasjones/reggen"
 	"time"
 	"sync"
+	"github.com/montanaflynn/stats"
 )
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -46,6 +47,7 @@ type AcceptanceFlow struct {
 	context    project.Context
 	createdMap core.IMap
 	config     *config.ClientConfig
+	samples    []float64
 }
 
 func NewFlow() AcceptanceFlow {
@@ -139,15 +141,20 @@ func (flow AcceptanceFlow) TryMap(t *testing.T, args ...int) AcceptanceFlow {
 
 	count, valueSize := countAndSize(args...)
 
+	samples := make([]float64, count)
 	for i := 0; i < count; i++ {
 		key := randSeq(42)
 		value := randSeq(valueSize)
 
+		start := time.Now()
 		mp.Put(key, value)
 		actual, _ := mp.Get(key)
+		end := time.Now()
+		samples[i] = float64(end.Sub(start))
 
 		assert.Equal(t, value, actual)
 	}
+	flow.samples = samples
 
 	s, _ := mp.Size()
 	assert.Equal(t, s, int32(count))
@@ -309,3 +316,13 @@ func (flow AcceptanceFlow) ExpectDisconnect(t *testing.T, wg *sync.WaitGroup, li
 	assert.Contains(t, msg, "DISCONNECTED")
 	return flow
 }
+
+func (flow AcceptanceFlow) Percentile(t *testing.T, limitInMillis float64) AcceptanceFlow{
+	m, _ := stats.Percentile(flow.samples, 95)
+	log.Printf("95 percentile %v ms", m/1e6)
+
+	assert.Condition(t, func() bool { return (m <= limitInMillis * 1e6)})
+	return flow
+
+}
+
