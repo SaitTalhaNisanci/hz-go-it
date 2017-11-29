@@ -1,11 +1,11 @@
-package acceptance
+package helper
 
 import (
 	"github.com/fsouza/go-dockerclient"
 	"log"
 )
 
-func getMemberIp(id string) []string{
+func GetMemberIp(id string) []string{
 	client, _ := docker.NewClientFromEnv()
 	container, _ := client.InspectContainer(id)
 

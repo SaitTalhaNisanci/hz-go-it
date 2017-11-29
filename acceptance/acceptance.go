@@ -17,6 +17,7 @@ import (
 	"time"
 	"sync"
 	"github.com/montanaflynn/stats"
+	"../helper"
 )
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -95,7 +96,7 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 	}
 
 	log.Print(containers)
-	flow.memberIp = getMemberIp(containers[0])
+	flow.memberIp = helper.GetMemberIp(containers[0])
 	return flow
 }
 
