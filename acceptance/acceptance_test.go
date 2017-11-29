@@ -12,9 +12,25 @@ func TestSingleMemberConnection(t *testing.T) {
 	flow.Project().Up().DefaultClient().TryMap(t).Down()
 }
 
-func TestClusterDiscovery(t *testing.T) {
+/**
+Cluster/Lifecycle Service
+Case 1 - Cluster Scale UP
+ */
+func TestClusterDiscoveryScaledUp(t *testing.T) {
 	flow := NewFlow()
-	flow.Project().Up().Scale(Scaling{Count:1}).DefaultClient().TryMap(t).Down()
+	expectedSize := 2
+	flow.Project().Up().Scale(Scaling{Count:expectedSize}).DefaultClient().TryMap(t).ClusterSize(t, expectedSize).Down()
+}
+
+/**
+Cluster/Lifecycle Service
+Case 2 - Cluster Scale Down
+ */
+func TestClusterDiscoveryWhenScaledDown(t *testing.T) {
+	flow := NewFlow()
+	increment := 2
+	expectedSize := 1
+	flow.Project().Up().Scale(Scaling{Count:increment}).DefaultClient().Scale(Scaling{Count:expectedSize}).ClusterSize(t, expectedSize).Down()
 }
 
 /**

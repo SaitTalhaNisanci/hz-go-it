@@ -4,6 +4,7 @@ import (
 	"golang.org/x/net/context"
 	"github.com/docker/libcompose/docker"
 	"github.com/docker/libcompose/docker/ctx"
+	"github.com/docker/libcompose/docker/client"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
 	"github.com/hazelcast/go-client"
@@ -17,7 +18,6 @@ import (
 	"time"
 	"sync"
 	"github.com/montanaflynn/stats"
-	"../helper"
 )
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -66,7 +66,7 @@ func (flow AcceptanceFlow) Project() AcceptanceFlow {
 		ProjectName:  flow.options.ProjectName,
 	}
 
-	project, err := docker.NewProject(&ctx.Context{
+	prj, err := docker.NewProject(&ctx.Context{
 		Context: flow.context,
 	}, nil)
 
@@ -74,21 +74,22 @@ func (flow AcceptanceFlow) Project() AcceptanceFlow {
 		panic(err)
 	}
 
-	flow.project = project
+	flow.project = prj
 	return flow
 }
 
 func (flow AcceptanceFlow) Up() AcceptanceFlow {
 	name := flow.options.ProjectName
+
 	err := flow.project.Up(context.Background(), options.Up{}, name)
 	if err != nil && flow.options.ImmediateFail {
 		panic(err)
 	}
-	//// todo improve wait on event
+
 	time.Sleep(10 * time.Second)
 
 	containers, err := flow.project.Containers(context.Background(), project.Filter{
-		State: project.AnyState,
+		State: project.Running,
 	}, flow.options.ProjectName)
 
 	if err != nil && flow.options.ImmediateFail {
@@ -96,7 +97,14 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 	}
 
 	log.Print(containers)
-	flow.memberIp = helper.GetMemberIp(containers[0])
+
+	factory, _ := client.NewDefaultFactory(client.Options{})
+	service, _ := flow.project.CreateService(flow.options.ProjectName)
+	apiClient := factory.Create(service)
+	response, _:= apiClient.ContainerInspect(context.Background(), containers[0])
+	log.Print(response.NetworkSettings.IPAddress)
+	flow.memberIp = []string{response.NetworkSettings.IPAddress}
+
 	return flow
 }
 
@@ -107,12 +115,17 @@ func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 	flow.project.Scale(context.Background(), 10000, m)
 
 	// todo improve wait on event
-	//time.Sleep(10 * time.Second)
+	time.Sleep(10 * time.Second)
+	return flow
+}
+
+func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlow{
+	actual := len(flow.client.GetCluster().GetMemberList())
+	assert.Equal(t, expected, actual)
 	return flow
 }
 
 func (flow AcceptanceFlow) Down() AcceptanceFlow {
-	//todo check cluster size
 	err := flow.project.Down(context.Background(), options.Down{})
 	if err != nil && flow.options.ImmediateFail {
 		panic(err)
@@ -129,15 +142,15 @@ func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
-	client, err := hazelcast.NewHazelcastClientWithConfig(config)
+	hz_client, err := hazelcast.NewHazelcastClientWithConfig(config)
 	if err != nil && flow.options.ImmediateFail {
 		flow.Down()
 		panic(err)
 	}
 
-	members := client.GetCluster().GetMemberList()
+	members := hz_client.GetCluster().GetMemberList()
 	log.Printf("Number of members : %v", len(members))
-	flow.client = client
+	flow.client = hz_client
 	flow.config = config
 	return flow
 }

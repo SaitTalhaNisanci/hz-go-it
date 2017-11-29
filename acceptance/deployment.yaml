@@ -4,10 +4,3 @@ hazelcast:
   image: hazelcast/hazelcast:3.9
   ports:
     - "5701"
-#client:
-#  image: go-it:1
-#  volumes:
-#        - "/var/run/docker.sock:/var/run/docker.sock"
-#        - "$GOPATH:/go"
-#  links:
-#    - hazelcast
