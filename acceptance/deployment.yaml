@@ -2,5 +2,5 @@
 #services:
 hazelcast:
   image: hazelcast/hazelcast:3.9
-#  ports:
-#    - "5701:5701"
+  ports:
+    - "5701"
