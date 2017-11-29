@@ -109,7 +109,9 @@ func (flow AcceptanceFlow) Down() AcceptanceFlow {
 
 func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 	var clientConfig = hazelcast.NewHazelcastConfig()
-	clientConfig.ClientNetworkConfig().SetAddresses([...]string{"hazelcast"})
+	s := make([]string, 1)
+	s[0] = "hazelcast"
+	clientConfig.ClientNetworkConfig().SetAddresses(s)
 	clientConfig.ClientNetworkConfig().SetConnectionAttemptLimit(5)
 	clientConfig.ClientNetworkConfig().SetConnectionTimeout(2)
 	return flow.Client(clientConfig)
