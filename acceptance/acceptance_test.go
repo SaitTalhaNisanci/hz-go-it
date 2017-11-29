@@ -9,6 +9,11 @@ import (
 
 func TestSingleMemberConnection(t *testing.T) {
 	flow := NewFlow()
+	flow.DefaultClient().TryMap(t).Down()
+}
+
+func TestSingleMemberConnection2(t *testing.T) {
+	flow := NewFlow()
 	flow.Project().Up().DefaultClient().TryMap(t).Down()
 }
 

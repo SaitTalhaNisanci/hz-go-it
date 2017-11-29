@@ -77,13 +77,15 @@ func (flow AcceptanceFlow) Project() AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) Up() AcceptanceFlow {
-	name := flow.options.ProjectName
-	err := flow.project.Up(context.Background(), options.Up{}, name)
-	if err != nil && flow.options.ImmediateFail {
-		panic(err)
-	}
-	//// todo improve wait on event
-	time.Sleep(10 * time.Second)
+	//name := flow.options.ProjectName
+	//err := flow.project.Up(context.Background(), options.Up{}, name)
+	//if err != nil && flow.options.ImmediateFail {
+	//	panic(err)
+	//}
+	////// todo improve wait on event
+	//time.Sleep(10 * time.Second)
+
+
 	return flow
 }
 
