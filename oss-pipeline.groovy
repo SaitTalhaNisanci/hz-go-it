@@ -3,24 +3,36 @@ pipeline {
         label "docker"
     }
 
+    parameters {
+        string(name: 'NAME', defaultValue: 'runner', description: 'Image name')
+    }
+
     options {
         timestamps()
     }
 
     stages {
 
-        stage('Check Docker') {
+        stage('Install Docker Compose') {
             steps {
-                //todo baris add init script
-                sh "sudo pip install docker-compose"
                 sh "sudo yum update -y"
-                sh "sudo yum install -y golang"
+                sh "sudo pip install docker-compose"
+                sh "docker-compose version"
+            }
+        }
+
+        stage('Build Runner') {
+            steps {
+                git changelog: false, poll: false, url: 'https://github.com/lazerion/hz-go-it.git'
+                script {
+                    runner = docker.build("${params.NAME}:${env.BUILD_ID}")
+                }
             }
         }
 
         stage('Acceptance') {
             steps {
-                sh "go test"
+                sh "docker run -v /var/run/docker.sock:/var/run/docker.sock -ti ${params.NAME}:${env.BUILD_ID}"
             }
         }
     }
@@ -29,6 +41,9 @@ pipeline {
         always {
             sh "docker-compose -f deployment.yaml down || true"
             cleanWs deleteDirs: true
+            script {
+                sh "docker rmi ${runner.id}"
+            }
         }
         failure {
             mail to: 'baris@hazelcast.com',

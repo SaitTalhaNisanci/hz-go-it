@@ -48,6 +48,7 @@ type AcceptanceFlow struct {
 	createdMap core.IMap
 	config     *config.ClientConfig
 	samples    []float64
+	memberIp   []string
 }
 
 func NewFlow() AcceptanceFlow {
@@ -77,15 +78,24 @@ func (flow AcceptanceFlow) Project() AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) Up() AcceptanceFlow {
-	//name := flow.options.ProjectName
-	//err := flow.project.Up(context.Background(), options.Up{}, name)
-	//if err != nil && flow.options.ImmediateFail {
-	//	panic(err)
-	//}
-	////// todo improve wait on event
-	//time.Sleep(10 * time.Second)
+	name := flow.options.ProjectName
+	err := flow.project.Up(context.Background(), options.Up{}, name)
+	if err != nil && flow.options.ImmediateFail {
+		panic(err)
+	}
+	//// todo improve wait on event
+	time.Sleep(10 * time.Second)
 
+	containers, err := flow.project.Containers(context.Background(), project.Filter{
+		State: project.AnyState,
+	}, flow.options.ProjectName)
 
+	if err != nil && flow.options.ImmediateFail {
+		panic(err)
+	}
+
+	log.Print(containers)
+	flow.memberIp = GetMemberIp(containers[0])
 	return flow
 }
 
@@ -111,6 +121,7 @@ func (flow AcceptanceFlow) Down() AcceptanceFlow {
 
 func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 	var clientConfig = hazelcast.NewHazelcastConfig()
+	clientConfig.ClientNetworkConfig().SetAddresses(flow.memberIp)
 	clientConfig.ClientNetworkConfig().SetConnectionAttemptLimit(5)
 	clientConfig.ClientNetworkConfig().SetConnectionTimeout(2)
 	return flow.Client(clientConfig)
@@ -184,7 +195,7 @@ func countAndSize(args ...int) (int, int) {
 func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
 	if flow.createdMap == nil {
 		var err error
-		name, _  := reggen.Generate("[a-z]42", 42)
+		name, _ := reggen.Generate("[a-z]42", 42)
 		flow.createdMap, err = flow.client.GetMap(name); if err != nil {
 			log.Printf("Error is %v", err)
 			return flow
@@ -326,11 +337,13 @@ func (flow AcceptanceFlow) ExpectDisconnect(t *testing.T, wg *sync.WaitGroup, li
 	return flow
 }
 
-func (flow AcceptanceFlow) Percentile(t *testing.T, limitInMillis float64) AcceptanceFlow{
+func (flow AcceptanceFlow) Percentile(t *testing.T, limitInMillis float64) AcceptanceFlow {
 	m, _ := stats.Percentile(flow.samples, 95)
-	log.Printf("95 percentile %v ms", m/1e6)
+	log.Printf("95 percentile %v ms", m / 1e6)
 
-	assert.Condition(t, func() bool { return (m <= limitInMillis * 1e6)})
+	assert.Condition(t, func() bool {
+		return (m <= limitInMillis * 1e6)
+	})
 	return flow
 
 }
