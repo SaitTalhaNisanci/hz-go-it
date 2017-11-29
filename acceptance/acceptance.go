@@ -95,7 +95,7 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 	}
 
 	log.Print(containers)
-	flow.memberIp = GetMemberIp(containers[0])
+	flow.memberIp = getMemberIp(containers[0])
 	return flow
 }
 

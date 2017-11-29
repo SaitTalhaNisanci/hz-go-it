@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-func GetMemberIp(id string) []string{
+func getMemberIp(id string) []string{
 	client, _ := docker.NewClientFromEnv()
 	container, _ := client.InspectContainer(id)
 
