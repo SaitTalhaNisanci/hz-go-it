@@ -17,6 +17,10 @@ func TestClusterDiscovery(t *testing.T) {
 	flow.Project().Up().Scale(Scaling{Count:1}).DefaultClient().TryMap(t).Down()
 }
 
+/**
+Basic Authentication
+Case 2 - Client Authentication Failure
+ */
 func TestClusterAuthenticationWithWrongCredentials(t *testing.T) {
 	flow := NewFlow()
 
