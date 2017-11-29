@@ -115,7 +115,7 @@ func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 	flow.project.Scale(context.Background(), 10000, m)
 
 	// todo improve wait on event
-	time.Sleep(10 * time.Second)
+	time.Sleep(30 * time.Second)
 	return flow
 }
 
@@ -142,6 +142,7 @@ func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
+	config.ClientNetworkConfig().SetAddresses(flow.memberIp)
 	hz_client, err := hazelcast.NewHazelcastClientWithConfig(config)
 	if err != nil && flow.options.ImmediateFail {
 		flow.Down()

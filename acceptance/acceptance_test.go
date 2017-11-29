@@ -59,7 +59,7 @@ Case 1 - Invocation Timeout/Network Config
 func TestInvocationTimeout(t *testing.T) {
 	flow := NewFlow()
 	config := hazelcast.NewHazelcastConfig()
-	config.ClientNetworkConfig().SetRedoOperation(true).SetConnectionAttemptLimit(1).SetInvocationTimeoutInSeconds(1)
+	config.ClientNetworkConfig().SetConnectionTimeout(1).SetRedoOperation(true).SetConnectionAttemptLimit(1).SetInvocationTimeoutInSeconds(1)
 
 	flow.Project().Up().Client(config).TryMap(t).Down().ExpectError(t)
 }
