@@ -10,7 +10,6 @@ import (
 	"github.com/hazelcast/go-client"
 	"github.com/stretchr/testify/assert"
 	"log"
-	"math/rand"
 	"testing"
 	"github.com/hazelcast/go-client/config"
 	"github.com/hazelcast/go-client/core"
@@ -18,27 +17,24 @@ import (
 	"time"
 	"sync"
 	"github.com/montanaflynn/stats"
+	"os/exec"
+	"strconv"
 )
-
-var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-//todo replace with reggen
-func randSeq(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		b[i] = letters[rand.Intn(len(letters))]
-	}
-	return string(b)
-}
 
 type Options struct {
 	ImmediateFail bool
 	ProjectName   string
 	File          string
+	Store         bool
 }
 
 type Scaling struct {
 	Count int
+}
+
+type Store struct {
+	entry	map[string]string
+	mapName string
 }
 
 type AcceptanceFlow struct {
@@ -50,6 +46,7 @@ type AcceptanceFlow struct {
 	config     *config.ClientConfig
 	samples    []float64
 	memberIp   []string
+	store      Store
 }
 
 func NewFlow() AcceptanceFlow {
@@ -57,6 +54,8 @@ func NewFlow() AcceptanceFlow {
 	flow.options.ImmediateFail = true
 	flow.options.ProjectName = "hazelcast"
 	flow.options.File = "./deployment.yaml"
+	flow.options.Store = false
+	flow.store = Store{entry:make(map[string]string),mapName:""}
 	return flow
 }
 
@@ -86,8 +85,6 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 		panic(err)
 	}
 
-	time.Sleep(10 * time.Second)
-
 	containers, err := flow.project.Containers(context.Background(), project.Filter{
 		State: project.Running,
 	}, flow.options.ProjectName)
@@ -96,31 +93,66 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 		panic(err)
 	}
 
-	log.Print(containers)
-
-	factory, _ := client.NewDefaultFactory(client.Options{})
-	service, _ := flow.project.CreateService(flow.options.ProjectName)
-	apiClient := factory.Create(service)
-	response, _:= apiClient.ContainerInspect(context.Background(), containers[0])
-	log.Print(response.NetworkSettings.IPAddress)
-	flow.memberIp = []string{response.NetworkSettings.IPAddress}
+	ip := find_ip(containers[0], flow.project, flow.options.ProjectName)
+	flow.memberIp = []string{ip}
+	wait_for_port(ip)
 
 	return flow
+}
+
+func find_ip(id string, project project.APIProject, name string) string {
+	factory, _ := client.NewDefaultFactory(client.Options{})
+	service, _ := project.CreateService(name)
+	apiClient := factory.Create(service)
+	response, _ := apiClient.ContainerInspect(context.Background(), id)
+	ip := response.NetworkSettings.IPAddress
+	return ip
+}
+
+func wait_for_port(ip string) {
+	commandStr := "./wait.sh " + ip + ":" + "5701" + " -t 10"
+	cmd := exec.Command("/bin/sh", "-c", commandStr)
+	_, err := cmd.Output()
+	if err != nil {
+		log.Print("Error on wait for port " + err.Error())
+	}
 }
 
 func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 
 	m := make(map[string]int)
 	m[flow.options.ProjectName] = options.Count
-	flow.project.Scale(context.Background(), 10000, m)
+	flow.project.Scale(context.Background(), int(10 * time.Second), m)
 
-	// todo improve wait on event
-	time.Sleep(30 * time.Second)
+	containers, _ := flow.project.Containers(context.Background(), project.Filter{
+		State: project.Running,
+	}, flow.options.ProjectName)
+
+	for _, container := range containers {
+		ip := find_ip(container, flow.project, flow.options.ProjectName)
+		wait_for_port(ip)
+	}
+
 	return flow
 }
 
-func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlow{
-	actual := len(flow.client.GetCluster().GetMemberList())
+func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlow {
+
+	const tryCount = 5
+	const tryTimeout = 2 * time.Second
+
+	var actual = 0
+	for idx := 0; idx < tryCount; idx++ {
+		actual = len(flow.client.GetCluster().GetMemberList())
+		if actual != expected {
+			time.Sleep(tryTimeout)
+			log.Printf("Cluster size is not met, retrying actual %d, expected %d", actual, expected)
+		} else {
+			break
+		}
+	}
+
+	log.Printf("Cluster size actual %d, expected %d", actual, expected)
 	assert.Equal(t, expected, actual)
 	return flow
 }
@@ -137,12 +169,15 @@ func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 	var clientConfig = hazelcast.NewHazelcastConfig()
 	clientConfig.ClientNetworkConfig().SetAddresses(flow.memberIp)
 	clientConfig.ClientNetworkConfig().SetConnectionAttemptLimit(5)
-	clientConfig.ClientNetworkConfig().SetConnectionTimeout(2)
+	clientConfig.ClientNetworkConfig().SetConnectionTimeout(5)
 	return flow.Client(clientConfig)
 }
 
 func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
-	config.ClientNetworkConfig().SetAddresses(flow.memberIp)
+	if flow.memberIp != nil || len(flow.memberIp) > 0 {
+		config.ClientNetworkConfig().SetAddresses(flow.memberIp)
+	}
+
 	hz_client, err := hazelcast.NewHazelcastClientWithConfig(config)
 	if err != nil && flow.options.ImmediateFail {
 		flow.Down()
@@ -157,7 +192,7 @@ func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) TryMap(t *testing.T, args ...int) AcceptanceFlow {
-	map_name := randSeq(42)
+	map_name, _ := reggen.Generate("[a-z]{42}", 42)
 	mp, err := flow.client.GetMap(map_name)
 	if err != nil {
 		flow.Down()
@@ -168,11 +203,14 @@ func (flow AcceptanceFlow) TryMap(t *testing.T, args ...int) AcceptanceFlow {
 	assert.Equal(t, size, int32(0))
 
 	count, valueSize := countAndSize(args...)
+	if flow.options.Store {
+		flow.store.mapName = map_name
+	}
 
 	samples := make([]float64, count)
 	for i := 0; i < count; i++ {
-		key := randSeq(42)
-		value := randSeq(valueSize)
+		key, _ := reggen.Generate("[a-z]{42}", 42)
+		value, _ := reggen.Generate("[a-z]{" + strconv.Itoa(valueSize) + "}", valueSize)
 
 		start := time.Now()
 		mp.Put(key, value)
@@ -181,6 +219,10 @@ func (flow AcceptanceFlow) TryMap(t *testing.T, args ...int) AcceptanceFlow {
 		samples[i] = float64(end.Sub(start))
 
 		assert.Equal(t, value, actual)
+
+		if flow.options.Store {
+			flow.store.entry[key] = value
+		}
 	}
 	flow.samples = samples
 
@@ -210,15 +252,15 @@ func countAndSize(args ...int) (int, int) {
 func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
 	if flow.createdMap == nil {
 		var err error
-		name, _ := reggen.Generate("[a-z]42", 42)
+		name, _ := reggen.Generate("[a-z]{42}", 42)
 		flow.createdMap, err = flow.client.GetMap(name); if err != nil {
 			log.Printf("Error is %v", err)
 			return flow
 		}
 	}
 
-	key := randSeq(42)
-	value := randSeq(42)
+	key, _ := reggen.Generate("[a-z]{42}", 42)
+	value, _ := reggen.Generate("[a-z]{42}", 42)
 
 	_, err := flow.createdMap.Put(key, value)
 	if err == nil {
@@ -276,7 +318,6 @@ func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
 	assert.Equal(t, size, len(actualValues))
 	assert.Subsetf(t, values, actualValues, "Fails value check")
 
-	//TODO below fails. inform go-client team
 	keySet, err := flow.createdMap.KeySetWithPredicate(core.Regex("this", keyRegex))
 	if err != nil {
 		flow.Down()
@@ -290,8 +331,8 @@ func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) EntryProcessor(t *testing.T, expected string, processor *EntryProcessor) AcceptanceFlow {
-	key, _ := reggen.Generate("^[a-z]", 42)
-	val, _ := reggen.Generate("^[0-9]", 1024)
+	key, _ := reggen.Generate("^[a-z]+", 42)
+	val, _ := reggen.Generate("^[0-9]+", 1024)
 
 	_, err := flow.createdMap.Put(key, val); if err != nil {
 		flow.Down()
@@ -337,7 +378,6 @@ func (flow AcceptanceFlow) ExpectConnect(t *testing.T, wg *sync.WaitGroup, liste
 	WaitTimeout(wg, 5000)
 
 	msg := listener.collector[len(listener.collector) - 1]
-	log.Print(msg)
 	assert.NotEmpty(t, msg)
 	assert.Contains(t, msg, "STARTED")
 	return flow
@@ -354,12 +394,22 @@ func (flow AcceptanceFlow) ExpectDisconnect(t *testing.T, wg *sync.WaitGroup, li
 
 func (flow AcceptanceFlow) Percentile(t *testing.T, limitInMillis float64) AcceptanceFlow {
 	m, _ := stats.Percentile(flow.samples, 95)
-	log.Printf("95 percentile %v ms", m / 1e6)
-
 	assert.Condition(t, func() bool {
 		return (m <= limitInMillis * 1e6)
 	})
 	return flow
 
+}
+
+func (flow AcceptanceFlow) VerifyStore(t *testing.T) AcceptanceFlow{
+	mp, err := flow.client.GetMap(flow.store.mapName); if err != nil {
+		flow.Down()
+		t.Fatal(err)
+	}
+	for k, v := range flow.store.entry {
+		actual, _ := mp.Get(k)
+		assert.Equal(t, v, actual)
+	}
+	return flow
 }
 
