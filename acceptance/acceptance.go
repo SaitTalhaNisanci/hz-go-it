@@ -138,7 +138,7 @@ func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 
 func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlow {
 
-	const tryCount = 10
+	const tryCount = 30
 	const tryTimeout = 2 * time.Second
 
 	var actual = 0

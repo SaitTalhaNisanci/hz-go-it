@@ -39,6 +39,13 @@ func TestDataIntactWhenMembersDown(t *testing.T) {
 	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).TryMap(t, 1024, 1024).Scale(Scaling{Count:1}).ClusterSize(t, 1).VerifyStore(t).Down()
 }
 
+func TestClientWhenClusterCompletelyGoOffAndOn(t *testing.T) {
+	flow := NewFlow()
+	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).Down().ClusterSize(t, 0)
+	flow.Up().Scale(Scaling{Count:2}).ClusterSize(t, 2).Down()
+
+}
+
 /**
 Basic Authentication
 Case 2 - Client Authentication Failure
