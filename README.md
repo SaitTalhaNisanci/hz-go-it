@@ -44,9 +44,15 @@ go version go1.9.2 darwin/amd64
 ## Building and Running Tests
 
 * Traverse to `./acceptance` directory and run below commands
+
 ```bash
 $ go get -u all
+Please note that you may need to download all dependencies one by one if `go get -u all` does not work
 $ go build
-$ go test
-```
 
+Build docker image to run IT tests in, therefore please traverse to root directory
+$ docker build . -t go-it:1
+And run tests as below
+$ docker run --name=go-it -v $GOPATH:/go -v /var/run/docker.sock:/var/run/docker.sock -v <your-path-to-project>/acceptance:/local/source go-it:1
+```
+ Please refer to `Dockerfile` and `client.sh` for tests to run and details.

@@ -138,7 +138,7 @@ func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 
 func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlow {
 
-	const tryCount = 5
+	const tryCount = 10
 	const tryTimeout = 2 * time.Second
 
 	var actual = 0
@@ -407,8 +407,16 @@ func (flow AcceptanceFlow) VerifyStore(t *testing.T) AcceptanceFlow{
 		t.Fatal(err)
 	}
 	for k, v := range flow.store.entry {
-		actual, _ := mp.Get(k)
-		assert.Equal(t, v, actual)
+		actual, err := mp.Get(k)
+		if err != nil {
+			flow.Down()
+			t.Fatal(err)
+		}
+		if actual != v {
+			flow.Down()
+			t.Fatal("key value mistmatch")
+		}
+		//assert.Equal(t, v, actual)
 	}
 	return flow
 }

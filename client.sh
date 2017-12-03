@@ -5,7 +5,7 @@ cd /local/source
 cd ./hz-go-it/acceptance/
 ls -al
 go env
-go test -run TestPredicate
+go test -run TestDataIntactWhenMembersDown
 rc=$?
 if [[ ${rc} -ne 0 ]] ; then
   echo 'could not perform tests with success'; exit $rc

@@ -31,9 +31,11 @@ pipeline {
         }
 
         stage('Acceptance') {
+            //TODO it can be change withRun docker plugin command/api
             steps {
                 sh "docker run -v /var/run/docker.sock:/var/run/docker.sock -ti ${params.NAME}:${env.BUILD_ID}"
             }
+            //TODO stop and remove running docker
         }
     }
 
