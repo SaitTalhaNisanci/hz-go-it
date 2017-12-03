@@ -2,18 +2,21 @@ package acceptance
 
 import (
 	"github.com/hazelcast/go-client/serialization"
+	"log"
 )
 
 type EntryProcessor struct {
 	classId           int32
 	value             string
 	identifiedFactory *IdentifiedFactory
+	count             int
 }
 
 func CreateEntryProcessor(value string) *EntryProcessor {
 	processor := &EntryProcessor{classId: 1, value: value}
 	identifiedFactory := &IdentifiedFactory{factoryId: 66, entryProcessor: processor}
 	processor.identifiedFactory = identifiedFactory
+	processor.count = 0
 	return processor
 }
 
@@ -33,10 +36,13 @@ func (identifiedFactory *IdentifiedFactory) Create(id int32) serialization.Ident
 func (entryProcessor *EntryProcessor) ReadData(input serialization.DataInput) error {
 	var err error
 	entryProcessor.value, err = input.ReadUTF()
+	log.Println("Read : " + entryProcessor.value)
 	return err
 }
 
 func (entryProcessor *EntryProcessor) WriteData(output serialization.DataOutput) error {
+	log.Println("Write: " + entryProcessor.value)
+	entryProcessor.count += 1
 	output.WriteUTF(entryProcessor.value)
 	return nil
 }
