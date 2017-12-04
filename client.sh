@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-#git clone https://github.com/lazerion/hz-go-it
-cd /local/source
+git clone https://github.com/lazerion/hz-go-it
+#cd /local/source
 cd ./hz-go-it/acceptance/
 ls -al
 go env
