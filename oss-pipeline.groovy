@@ -1,26 +1,43 @@
 pipeline {
     agent {
-        label "docker"
+        label "docker-image-test"
     }
 
     parameters {
         string(name: 'NAME', defaultValue: 'runner', description: 'Image name')
     }
 
-    options {
-        timestamps()
-    }
-
     stages {
 
-        stage('Install Docker Compose') {
+        stage('Install Tools') {
             steps {
-                sh "sudo yum update -y"
                 sh "sudo pip install docker-compose"
-                sh "docker-compose version"
+                sh "sudo yum install -y golang"
             }
         }
 
+        stage('Checkout') {
+            steps {
+                git branch: 'master', credentialsId: '7df9a580-f2f9-4a4a-9523-b22157b6d32f', url: 'https://github.com/hazelcast/go-client.git'
+                sh "mkdir -p /home/ec2-user/go/src/github.com/hazelcast/go-client"
+                sh "sudo cp -R ./ /home/ec2-user/go/src/github.com/hazelcast/go-client/"
+            }
+        }
+
+        stage('Load Dependencies') {
+            steps {
+                sh """
+                        go get golang.org/x/net/context
+                        go get github.com/docker/libcompose/docker
+                        go get github.com/docker/libcompose/docker/ctx
+                        go get github.com/docker/libcompose/project
+                        go get github.com/docker/libcompose/project/options 
+                        go get github.com/stretchr/testify/assert
+                        go get github.com/lucasjones/reggen
+                        go get github.com/montanaflynn/stats
+                """
+            }
+        }
         stage('Build Runner') {
             steps {
                 git changelog: false, poll: false, url: 'https://github.com/lazerion/hz-go-it.git'
@@ -31,18 +48,17 @@ pipeline {
         }
 
         stage('Acceptance') {
-            //TODO it can be change withRun docker plugin command/api
             steps {
-                sh "docker run -v /var/run/docker.sock:/var/run/docker.sock -ti ${params.NAME}:${env.BUILD_ID}"
+                sh "docker run --name=go-it -v /home/ec2-user/go:/go -v /var/run/docker.sock:/var/run/docker.sock ${params.NAME}:${env.BUILD_ID}"
             }
-            //TODO stop and remove running docker
         }
     }
 
     post {
         always {
-            sh "docker-compose -f deployment.yaml down || true"
-            cleanWs deleteDirs: true
+            sh "docker-compose -f ./acceptance/deployment.yaml down || true"
+            sh "docker stop go-it || true"
+            sh "docker rm go-it || true"
             script {
                 sh "docker rmi ${runner.id}"
             }
