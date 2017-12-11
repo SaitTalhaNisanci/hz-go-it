@@ -49,7 +49,9 @@ pipeline {
 
         stage('Acceptance') {
             steps {
-                sh "docker run --name=go-it -v /home/ec2-user/go:/go -v /var/run/docker.sock:/var/run/docker.sock ${params.NAME}:${env.BUILD_ID}"
+                sh "docker network create --attachable=true go-it"
+                sh "docker run --network=go-it --name=go-it -v /home/ec2-user/go:/go -v /var/run/docker.sock:/var/run/docker.sock ${params.NAME}:${env.BUILD_ID}"
+                sh "docker network rm go-it"
             }
         }
     }

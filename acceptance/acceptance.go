@@ -4,7 +4,6 @@ import (
 	"golang.org/x/net/context"
 	"github.com/docker/libcompose/docker"
 	"github.com/docker/libcompose/docker/ctx"
-	"github.com/docker/libcompose/docker/client"
 	"github.com/docker/libcompose/project"
 	"github.com/docker/libcompose/project/options"
 	"github.com/hazelcast/go-client"
@@ -17,7 +16,6 @@ import (
 	"time"
 	"sync"
 	"github.com/montanaflynn/stats"
-	"os/exec"
 	"strconv"
 )
 
@@ -93,29 +91,11 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 		panic(err)
 	}
 
-	ip := find_ip(containers[0], flow.project, flow.options.ProjectName)
+	ip := find_container_ip(containers[0])
 	flow.memberIp = []string{ip}
 	wait_for_port(ip)
 
 	return flow
-}
-
-func find_ip(id string, project project.APIProject, name string) string {
-	factory, _ := client.NewDefaultFactory(client.Options{})
-	service, _ := project.CreateService(name)
-	apiClient := factory.Create(service)
-	response, _ := apiClient.ContainerInspect(context.Background(), id)
-	ip := response.NetworkSettings.IPAddress
-	return ip
-}
-
-func wait_for_port(ip string) {
-	commandStr := "./wait.sh " + ip + ":" + "5701" + " -t 10"
-	cmd := exec.Command("/bin/sh", "-c", commandStr)
-	_, err := cmd.Output()
-	if err != nil {
-		log.Print("Error on wait for port " + err.Error())
-	}
 }
 
 func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
@@ -129,7 +109,7 @@ func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 	}, flow.options.ProjectName)
 
 	for _, container := range containers {
-		ip := find_ip(container, flow.project, flow.options.ProjectName)
+		ip := find_container_ip(container)
 		wait_for_port(ip)
 	}
 

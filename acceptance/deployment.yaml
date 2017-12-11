@@ -1,6 +1,12 @@
-#version: '3'
-#services:
-hazelcast:
-  image: hazelcast/hazelcast:3.9
-  ports:
-    - "5701"
+version: "2"
+services:
+  hazelcast:
+    image: hazelcast/hazelcast:3.9
+    ports:
+      - "5701"
+    networks:
+      - go-it
+networks:
+    go-it:
+      external:
+        name: go-it
