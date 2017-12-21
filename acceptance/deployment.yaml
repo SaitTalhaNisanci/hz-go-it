@@ -1,12 +1,12 @@
 version: "2"
 services:
-  hazelcast:
+  hazelcast-go-it:
     image: hazelcast/hazelcast:3.9
     ports:
       - "5701"
     networks:
-      - go-it
+      - hz-go-it
 networks:
-    go-it:
+    hz-go-it:
       external:
-        name: go-it
+        name: hz-go-it

@@ -50,7 +50,7 @@ type AcceptanceFlow struct {
 func NewFlow() AcceptanceFlow {
 	flow := AcceptanceFlow{}
 	flow.options.ImmediateFail = true
-	flow.options.ProjectName = "hazelcast"
+	flow.options.ProjectName = "hazelcast-go-it"
 	flow.options.File = "./deployment.yaml"
 	flow.options.Store = false
 	flow.store = Store{entry:make(map[string]string), mapName:""}

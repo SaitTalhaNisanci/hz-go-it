@@ -21,7 +21,7 @@ func find_container_ip(id string) string {
 	for _, resource := range resources {
 		if resource.Name == "go-it" {
 			container := resource.Containers[id]
-			if strings.Contains(container.Name, "hazelcast") {
+			if strings.Contains(container.Name, "hazelcast-go-it") {
 				ip = strings.Split(container.IPv4Address, "/")[0]
 			}
 		}
