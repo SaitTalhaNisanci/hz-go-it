@@ -92,6 +92,7 @@ func (flow AcceptanceFlow) Up() AcceptanceFlow {
 	}
 
 	ip := find_container_ip(containers[0])
+	log.Printf("IP %v", ip)
 	flow.memberIp = []string{ip}
 	wait_for_port(ip)
 
