@@ -2,7 +2,7 @@ package acceptance
 
 import (
 	"testing"
-	"github.com/hazelcast/go-client"
+	"github.com/hazelcast/hazelcast-go-client"
 	"sync"
 	"github.com/lucasjones/reggen"
 )

@@ -11,9 +11,9 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git branch: 'master', credentialsId: '7df9a580-f2f9-4a4a-9523-b22157b6d32f', url: 'https://github.com/hazelcast/go-client.git'
-                sh "sudo mkdir -p /home/jenkins/go/src/github.com/hazelcast/go-client"
-                sh "sudo cp -R ./ /home/jenkins/go/src/github.com/hazelcast/go-client/"
+                git branch: 'master', credentialsId: '7df9a580-f2f9-4a4a-9523-b22157b6d32f', url: 'https://github.com/hazelcast/hazelcast-go-client/'
+                sh "sudo mkdir -p /home/jenkins/go/src/github.com/hazelcast/hazelcast-go-client"
+                sh "sudo cp -R ./ /home/jenkins/go/src/github.com/hazelcast/hazelcast-go-client/"
                 sh "sudo chmod -R 777 /home/jenkins/go"
             }
         }
@@ -47,7 +47,8 @@ pipeline {
 
         stage('Acceptance') {
             steps {
-                sh "docker network create --attachable=true go-it"
+                sh "docker-compose -f ./acceptance/deployment.yaml down || true"
+                sh "docker network create --attachable=true go-it || true"
                 sh "docker run --network=go-it --name=go-it -v /home/jenkins/go:/go -v /var/run/docker.sock:/var/run/docker.sock ${params.NAME}:${env.BUILD_ID}"
             }
         }
