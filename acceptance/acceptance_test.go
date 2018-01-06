@@ -5,6 +5,8 @@ import (
 	"github.com/hazelcast/hazelcast-go-client"
 	"sync"
 	"github.com/lucasjones/reggen"
+	"log"
+	"time"
 )
 
 func TestSingleMemberConnection(t *testing.T) {
@@ -36,33 +38,33 @@ func TestClusterDiscoveryWhenScaledDown(t *testing.T) {
 func TestDataIntactWhenMembersDown(t *testing.T) {
 	flow := NewFlow()
 	flow.options.Store = true
-	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).TryMap(t, 1024, 1024).Scale(Scaling{Count:1}).ClusterSize(t, 1).VerifyStore(t).Down()
+	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).TryMap(t, 1024, 1024).Scale(Scaling{Count:2}).ClusterSize(t, 2).VerifyStore(t).Down()
 }
 
 func TestClientWhenClusterCompletelyGoOffAndOn(t *testing.T) {
 	flow := NewFlow()
-	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).Down().ClusterSize(t, 0)
-	flow.Up().Scale(Scaling{Count:2}).ClusterSize(t, 2).Down()
-
+	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).Down().ClusterSize(t, 0).Up().Scale(Scaling{Count:2}).ClusterSize(t, 2).Down()
 }
 
 /**
 Basic Authentication
 Case 2 - Client Authentication Failure
+
  */
 func TestClusterAuthenticationWithWrongCredentials(t *testing.T) {
 	flow := NewFlow()
 
-	name, _ := reggen.Generate("[a-z]42", 42)
-	password, _ := reggen.Generate("[a-z]42", 42)
+	name, _ := reggen.Generate("[a-z]{8}", 8)
+	password, _ := reggen.Generate("[a-z]{8}", 8)
 
+	log.Printf("name %v, password %v", name, password)
 	config := hazelcast.NewHazelcastConfig()
 	config.GroupConfig().SetName(name)
 	config.GroupConfig().SetPassword(password)
 
 	flow.options.ImmediateFail = false
 
-	flow.Project().Up().Client(config).ExpectError(t).Down()
+	flow.Project().Up().Client(config).Down()
 }
 
 /**
@@ -72,9 +74,11 @@ Case 1 - Invocation Timeout/Network Config
 func TestInvocationTimeout(t *testing.T) {
 	flow := NewFlow()
 	config := hazelcast.NewHazelcastConfig()
-	config.ClientNetworkConfig().SetConnectionTimeout(1).SetRedoOperation(true).SetConnectionAttemptLimit(1).SetInvocationTimeoutInSeconds(1)
+	config.ClientNetworkConfig().SetConnectionTimeout(1).SetRedoOperation(true).SetConnectionAttemptLimit(2).SetInvocationTimeoutInSeconds(1)
 
-	flow.Project().Up().Client(config).TryMap(t).Down().ExpectError(t)
+	flow = flow.Project().Up()
+	time.Sleep(10 * time.Second)
+	flow.Client(config).TryMap(t).Down().ExpectError(t)
 }
 
 /**
@@ -150,7 +154,7 @@ func TestWhenClusterScaleDown(t *testing.T) {
 	config := hazelcast.NewHazelcastConfig()
 	listener := LifeCycleListener{wg: wg, collector: make([]string, 0)}
 	config.AddLifecycleListener(&listener)
-	config.ClientNetworkConfig().SetConnectionAttemptLimit(1)
+	config.ClientNetworkConfig().SetConnectionAttemptLimit(10)
 
 	flow.Project().Up().Client(config).TryMap(t).Down().ExpectDisconnect(t, wg, listener)
 }

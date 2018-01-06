@@ -141,7 +141,7 @@ func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlo
 func (flow AcceptanceFlow) Down() AcceptanceFlow {
 	err := flow.project.Down(context.Background(), options.Down{})
 	if err != nil && flow.options.ImmediateFail {
-		panic(err)
+		log.Fatal(err)
 	}
 	return flow
 }
@@ -160,9 +160,12 @@ func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
 	}
 
 	hz_client, err := hazelcast.NewHazelcastClientWithConfig(config)
-	if err != nil && flow.options.ImmediateFail {
+	if err != nil {
 		flow.Down()
-		panic(err)
+		if flow.options.ImmediateFail {
+			log.Fatal(err)
+		}
+		return flow
 	}
 
 	members := hz_client.GetCluster().GetMemberList()
@@ -299,12 +302,12 @@ func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
 	assert.Equal(t, size, len(actualValues))
 	assert.Subsetf(t, values, actualValues, "Fails value check")
 
-	keySet, err := flow.createdMap.KeySetWithPredicate(core.Regex("this", keyRegex))
+	keySet, err := flow.createdMap.KeySetWithPredicate(core.Regex("this", valueRegex))
 	if err != nil {
 		flow.Down()
 		t.Fatalf("Predicate error %v", err)
 	}
-	assert.Equal(t, len(keySet), size)
+	assert.Equal(t, size, len(keySet))
 
 	flow.createdMap.Clear()
 
@@ -385,16 +388,17 @@ func (flow AcceptanceFlow) VerifyStore(t *testing.T) AcceptanceFlow {
 		t.Fatal(err)
 	}
 	for k, v := range flow.store.entry {
+		log.Printf("Key %v", k)
 		actual, err := mp.Get(k)
 		if err != nil {
 			flow.Down()
 			t.Fatal(err)
 		}
+		log.Printf("Actual %v, Expected %v", actual, v)
 		if actual != v {
 			flow.Down()
 			t.Fatal("key value mistmatch")
 		}
-		//assert.Equal(t, v, actual)
 	}
 	return flow
 }
