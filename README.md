@@ -58,3 +58,14 @@ And run tests as below
 $ docker run --network=hz-go-it --name=go-it -v $GOPATH:/go -v /var/run/docker.sock:/var/run/docker.sock -v <your-path-to-project>/acceptance:/local/source go-it:1
 ```
  Please refer to `Dockerfile` and `client.sh` for tests to run and details.
+ 
+ You may update `client.sh` for local run as below
+ ```$bash
+ #!/usr/bin/env bash
+cd /local/source
+go test -v -run TestInvocationTimeout
+rc=$?
+if [[ ${rc} -ne 0 ]] ; then
+  echo 'could not perform tests with success'; exit $rc
+fi
+ ```
