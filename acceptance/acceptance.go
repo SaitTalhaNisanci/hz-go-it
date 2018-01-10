@@ -148,6 +148,9 @@ func (flow AcceptanceFlow) Down() AcceptanceFlow {
 
 func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 	var clientConfig = hazelcast.NewHazelcastConfig()
+	const tryTimeout = 10 * time.Second
+	time.Sleep(tryTimeout)
+	log.Print(flow.memberIp)
 	clientConfig.ClientNetworkConfig().SetAddresses(flow.memberIp)
 	clientConfig.ClientNetworkConfig().SetConnectionAttemptLimit(5)
 	clientConfig.ClientNetworkConfig().SetConnectionTimeout(5)
