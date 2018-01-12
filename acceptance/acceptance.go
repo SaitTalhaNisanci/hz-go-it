@@ -16,7 +16,6 @@ import (
 	"time"
 	"sync"
 	"github.com/montanaflynn/stats"
-	"strconv"
 )
 
 type Options struct {
@@ -119,7 +118,7 @@ func (flow AcceptanceFlow) Scale(options Scaling) AcceptanceFlow {
 
 func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlow {
 
-	const tryCount = 30
+	const tryCount = 10
 	const tryTimeout = 2 * time.Second
 
 	var actual = 0
@@ -139,6 +138,11 @@ func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlo
 }
 
 func (flow AcceptanceFlow) Down() AcceptanceFlow {
+	flow.client.Shutdown();
+	return flow.ClusterDown()
+}
+
+func (flow AcceptanceFlow) ClusterDown() AcceptanceFlow {
 	err := flow.project.Down(context.Background(), options.Down{})
 	if err != nil && flow.options.ImmediateFail {
 		log.Fatal(err)
@@ -148,9 +152,6 @@ func (flow AcceptanceFlow) Down() AcceptanceFlow {
 
 func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 	var clientConfig = hazelcast.NewHazelcastConfig()
-	const tryTimeout = 10 * time.Second
-	time.Sleep(tryTimeout)
-	log.Print(flow.memberIp)
 	clientConfig.ClientNetworkConfig().SetAddresses(flow.memberIp)
 	clientConfig.ClientNetworkConfig().SetConnectionAttemptLimit(5)
 	clientConfig.ClientNetworkConfig().SetConnectionTimeout(5)
@@ -164,7 +165,7 @@ func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
 
 	hz_client, err := hazelcast.NewHazelcastClientWithConfig(config)
 	if err != nil {
-		flow.Down()
+		flow.ClusterDown()
 		if flow.options.ImmediateFail {
 			log.Fatal(err)
 		}
@@ -197,7 +198,7 @@ func (flow AcceptanceFlow) TryMap(t *testing.T, args ...int) AcceptanceFlow {
 	samples := make([]float64, count)
 	for i := 0; i < count; i++ {
 		key, _ := reggen.Generate("[a-z]{42}", 42)
-		value, _ := reggen.Generate("[a-z]{" + strconv.Itoa(valueSize) + "}", valueSize)
+		value, _ := reggen.Generate("[0-9]*", valueSize)
 
 		start := time.Now()
 		mp.Put(key, value)
@@ -215,16 +216,18 @@ func (flow AcceptanceFlow) TryMap(t *testing.T, args ...int) AcceptanceFlow {
 
 	s, _ := mp.Size()
 	assert.Equal(t, s, int32(count))
-	mp.Clear()
-	s, _ = mp.Size()
-	assert.Equal(t, s, int32(0))
+	if !flow.options.Store {
+		mp.Clear()
+		s, _ = mp.Size()
+		assert.Equal(t, s, int32(0))
+	}
 
 	flow.createdMap = mp
 	return flow
 }
 
 func countAndSize(args ...int) (int, int) {
-	if len(args) == 0 || args == nil {
+	if args == nil || len(args) == 0 {
 		return 1, 1024
 	}
 	if len(args) == 1 {
@@ -233,6 +236,7 @@ func countAndSize(args ...int) (int, int) {
 	if len(args) > 1 {
 		return args[0], args[1]
 	}
+
 	return 1, 1
 }
 
@@ -311,6 +315,7 @@ func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
 		t.Fatalf("Predicate error %v", err)
 	}
 	assert.Equal(t, size, len(keySet))
+	assert.Subsetf(t, keys, keySet, "Fails key check")
 
 	flow.createdMap.Clear()
 
@@ -379,7 +384,7 @@ func (flow AcceptanceFlow) ExpectDisconnect(t *testing.T, wg *sync.WaitGroup, li
 func (flow AcceptanceFlow) Percentile(t *testing.T, limitInMillis float64) AcceptanceFlow {
 	m, _ := stats.Percentile(flow.samples, 95)
 	assert.Condition(t, func() bool {
-		return (m <= limitInMillis * 1e6)
+		return (m <= limitInMillis * 1e6 && m > 0)
 	})
 	return flow
 
@@ -391,13 +396,11 @@ func (flow AcceptanceFlow) VerifyStore(t *testing.T) AcceptanceFlow {
 		t.Fatal(err)
 	}
 	for k, v := range flow.store.entry {
-		log.Printf("Key %v", k)
 		actual, err := mp.Get(k)
 		if err != nil {
 			flow.Down()
 			t.Fatal(err)
 		}
-		log.Printf("Actual %v, Expected %v", actual, v)
 		if actual != v {
 			flow.Down()
 			t.Fatal("key value mistmatch")

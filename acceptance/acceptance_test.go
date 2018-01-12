@@ -35,15 +35,16 @@ func TestClusterDiscoveryWhenScaledDown(t *testing.T) {
 	flow.Project().Up().Scale(Scaling{Count:increment}).DefaultClient().Scale(Scaling{Count:expectedSize}).ClusterSize(t, expectedSize).Down()
 }
 
+func TestStoreVerificationOnMultipleMemberCluster(t *testing.T) {
+	flow := NewFlow()
+	flow.options.Store = true
+	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).TryMap(t, 1024, 1024, 1).VerifyStore(t).Down()
+}
+
 func TestDataIntactWhenMembersDown(t *testing.T) {
 	flow := NewFlow()
 	flow.options.Store = true
-	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).TryMap(t, 1024, 1024).Scale(Scaling{Count:2}).ClusterSize(t, 2).VerifyStore(t).Down()
-}
-
-func TestClientWhenClusterCompletelyGoOffAndOn(t *testing.T) {
-	flow := NewFlow()
-	flow.Project().Up().Scale(Scaling{Count:3}).DefaultClient().ClusterSize(t, 3).Down().ClusterSize(t, 0).Up().Scale(Scaling{Count:2}).ClusterSize(t, 2).Down()
+	flow.Project().Up().DefaultClient().Scale(Scaling{Count:3}).ClusterSize(t, 3).TryMap(t, 1024, 1024).Scale(Scaling{Count:2}).ClusterSize(t, 2).VerifyStore(t).Down()
 }
 
 /**
@@ -64,12 +65,14 @@ func TestClusterAuthenticationWithWrongCredentials(t *testing.T) {
 
 	flow.options.ImmediateFail = false
 
-	flow.Project().Up().Client(config).Down()
+	flow.Project().Up().Client(config)
+	// unable to test anything else client panics every operation.
 }
 
 /**
 Basic Config
 Case 1 - Invocation Timeout/Network Config
+TODO this test need to be improved for max time expectation
  */
 func TestInvocationTimeout(t *testing.T) {
 	flow := NewFlow()
@@ -156,7 +159,7 @@ func TestWhenClusterScaleDown(t *testing.T) {
 	config.AddLifecycleListener(&listener)
 	config.ClientNetworkConfig().SetConnectionAttemptLimit(10)
 
-	flow.Project().Up().Client(config).TryMap(t).Down().ExpectDisconnect(t, wg, listener)
+	flow.Project().Up().Client(config).TryMap(t).ClusterDown().ExpectDisconnect(t, wg, listener).Down()
 }
 
 /**
