@@ -12,6 +12,7 @@ import (
 	"testing"
 	"github.com/hazelcast/hazelcast-go-client/config"
 	"github.com/hazelcast/hazelcast-go-client/core"
+	"github.com/hazelcast/hazelcast-go-client/core/predicate"
 	"github.com/lucasjones/reggen"
 	"time"
 	"sync"
@@ -37,10 +38,10 @@ type Store struct {
 type AcceptanceFlow struct {
 	options    Options
 	project    project.APIProject
-	client     hazelcast.IHazelcastInstance
+	client     hazelcast.Instance
 	context    project.Context
-	createdMap core.IMap
-	config     *config.ClientConfig
+	createdMap core.Map
+	config     *config.Config
 	samples    []float64
 	memberIp   []string
 	store      Store
@@ -123,7 +124,7 @@ func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlo
 
 	var actual = 0
 	for idx := 0; idx < tryCount; idx++ {
-		actual = len(flow.client.GetCluster().GetMemberList())
+		actual = len(flow.client.GetCluster().GetMembers())
 		if actual != expected {
 			time.Sleep(tryTimeout)
 			log.Printf("Cluster size is not met, retrying actual %d, expected %d", actual, expected)
@@ -151,19 +152,19 @@ func (flow AcceptanceFlow) ClusterDown() AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
-	var clientConfig = hazelcast.NewHazelcastConfig()
-	clientConfig.ClientNetworkConfig().SetAddresses(flow.memberIp)
-	clientConfig.ClientNetworkConfig().SetConnectionAttemptLimit(5)
-	clientConfig.ClientNetworkConfig().SetConnectionTimeout(5)
+	var clientConfig = hazelcast.NewConfig()
+	clientConfig.NetworkConfig().SetAddresses(flow.memberIp)
+	clientConfig.NetworkConfig().SetConnectionAttemptLimit(5)
+	clientConfig.NetworkConfig().SetConnectionTimeout(5)
 	return flow.Client(clientConfig)
 }
 
-func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
+func (flow AcceptanceFlow) Client(config *config.Config) AcceptanceFlow {
 	if flow.memberIp != nil || len(flow.memberIp) > 0 {
-		config.ClientNetworkConfig().SetAddresses(flow.memberIp)
+		config.NetworkConfig().SetAddresses(flow.memberIp)
 	}
 
-	hz_client, err := hazelcast.NewHazelcastClientWithConfig(config)
+	hz_client, err := hazelcast.NewClientWithConfig(config)
 	if err != nil {
 		flow.ClusterDown()
 		if flow.options.ImmediateFail {
@@ -172,7 +173,7 @@ func (flow AcceptanceFlow) Client(config *config.ClientConfig) AcceptanceFlow {
 		return flow
 	}
 
-	members := hz_client.GetCluster().GetMemberList()
+	members := hz_client.GetCluster().GetMembers()
 	log.Printf("Number of members : %v", len(members))
 	flow.client = hz_client
 	flow.config = config
@@ -265,7 +266,7 @@ func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) ExpectConnection(t *testing.T, expected int) AcceptanceFlow {
-	members := flow.client.GetCluster().GetMemberList()
+	members := flow.client.GetCluster().GetMembers()
 	assert.Equal(t, expected, len(members))
 	return flow
 }
@@ -295,21 +296,21 @@ func (flow AcceptanceFlow) Predicate(t *testing.T) AcceptanceFlow {
 	s, _ = flow.createdMap.Size()
 	assert.Equal(t, s, int32(size))
 
-	entrySet, err := flow.createdMap.EntrySetWithPredicate(core.Regex("this", valueRegex))
+	entrySet, err := flow.createdMap.EntrySetWithPredicate(predicate.Regex("this", valueRegex))
 	if err != nil {
 		flow.Down()
 		t.Fatalf("Predicate error %v", err)
 	}
 	assert.Equal(t, size, len(entrySet))
 
-	actualValues, err := flow.createdMap.ValuesWithPredicate(core.Regex("this", valueRegex))
+	actualValues, err := flow.createdMap.ValuesWithPredicate(predicate.Regex("this", valueRegex))
 	if err != nil {
 		t.Fatalf("Predicate error %v", err)
 	}
 	assert.Equal(t, size, len(actualValues))
 	assert.Subsetf(t, values, actualValues, "Fails value check")
 
-	keySet, err := flow.createdMap.KeySetWithPredicate(core.Regex("this", valueRegex))
+	keySet, err := flow.createdMap.KeySetWithPredicate(predicate.Regex("this", valueRegex))
 	if err != nil {
 		flow.Down()
 		t.Fatalf("Predicate error %v", err)
@@ -387,7 +388,6 @@ func (flow AcceptanceFlow) Percentile(t *testing.T, limitInMillis float64) Accep
 		return (m <= limitInMillis * 1e6 && m > 0)
 	})
 	return flow
-
 }
 
 func (flow AcceptanceFlow) VerifyStore(t *testing.T) AcceptanceFlow {
@@ -408,4 +408,3 @@ func (flow AcceptanceFlow) VerifyStore(t *testing.T) AcceptanceFlow {
 	}
 	return flow
 }
-

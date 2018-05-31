@@ -59,7 +59,7 @@ func TestClusterAuthenticationWithWrongCredentials(t *testing.T) {
 	password, _ := reggen.Generate("[a-z]{8}", 8)
 
 	log.Printf("name %v, password %v", name, password)
-	config := hazelcast.NewHazelcastConfig()
+	config := hazelcast.NewConfig()
 	config.GroupConfig().SetName(name)
 	config.GroupConfig().SetPassword(password)
 
@@ -76,8 +76,12 @@ TODO this test need to be improved for max time expectation
  */
 func TestInvocationTimeout(t *testing.T) {
 	flow := NewFlow()
-	config := hazelcast.NewHazelcastConfig()
-	config.ClientNetworkConfig().SetConnectionTimeout(1).SetRedoOperation(true).SetConnectionAttemptLimit(2).SetInvocationTimeoutInSeconds(1)
+	config := hazelcast.NewConfig()
+	nc := config.NetworkConfig()
+	nc.SetConnectionTimeout(1 * time.Second)
+	nc.SetRedoOperation(true)
+	nc.SetConnectionAttemptLimit(2)
+	nc.SetInvocationTimeout(1 * time.Second)
 
 	flow = flow.Project().Up()
 	time.Sleep(10 * time.Second)
@@ -90,8 +94,8 @@ Case 2 - Smart Routing When Set to False
  */
 func TestSmartRoutingDisabled(t *testing.T) {
 	flow := NewFlow()
-	config := hazelcast.NewHazelcastConfig()
-	config.ClientNetworkConfig().SetSmartRouting(false)
+	config := hazelcast.NewConfig()
+	config.NetworkConfig().SetSmartRouting(false)
 
 	flow.Project().Up().Client(config).TryMap(t).ExpectConnection(t, 1).Down()
 }
@@ -120,11 +124,11 @@ Case 1 - Basic Map Get/Put/Delete
  */
 func TestEntryProcessor(t *testing.T) {
 	flow := NewFlow()
-	config := hazelcast.NewHazelcastConfig()
+	config := hazelcast.NewConfig()
 	expected := "test"
 	processor := CreateEntryProcessor(expected)
 
-	config.SerializationConfig().AddDataSerializableFactory(processor.identifiedFactory.factoryId, processor.identifiedFactory)
+	config.SerializationConfig().AddDataSerializableFactory(processor.identifiedFactory.factoryID, processor.identifiedFactory)
 	flow.Project().Up().Client(config).TryMap(t).EntryProcessor(t, expected, processor).Down()
 }
 
@@ -137,10 +141,10 @@ func TestWhenClusterScaleUp(t *testing.T) {
 
 	var wg *sync.WaitGroup = new(sync.WaitGroup)
 	wg.Add(10)
-	config := hazelcast.NewHazelcastConfig()
+	config := hazelcast.NewConfig()
 	listener := LifeCycleListener{wg: wg, collector: make([]string, 0)}
 	config.AddLifecycleListener(&listener)
-	config.ClientNetworkConfig().SetConnectionAttemptLimit(5)
+	config.NetworkConfig().SetConnectionAttemptLimit(5)
 
 	flow.Project().Up().Client(config).TryMap(t).ExpectConnect(t, wg, listener).Down()
 }
@@ -154,10 +158,10 @@ func TestWhenClusterScaleDown(t *testing.T) {
 
 	var wg *sync.WaitGroup = new(sync.WaitGroup)
 	wg.Add(10)
-	config := hazelcast.NewHazelcastConfig()
+	config := hazelcast.NewConfig()
 	listener := LifeCycleListener{wg: wg, collector: make([]string, 0)}
 	config.AddLifecycleListener(&listener)
-	config.ClientNetworkConfig().SetConnectionAttemptLimit(10)
+	config.NetworkConfig().SetConnectionAttemptLimit(10)
 
 	flow.Project().Up().Client(config).TryMap(t).ClusterDown().ExpectDisconnect(t, wg, listener).Down()
 }
@@ -171,8 +175,3 @@ func TestBasicMapOperationsPerformance(t *testing.T) {
 	flow := NewFlow()
 	flow.Project().Up().DefaultClient().TryMap(t, 1024, 1024).Percentile(t, 3).Down()
 }
-
-
-
-
-

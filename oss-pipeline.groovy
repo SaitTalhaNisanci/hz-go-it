@@ -3,6 +3,8 @@ pipeline {
         label "lab"
     }
 
+    options { timeout(time: 1, unit: 'HOURS') }
+
     parameters {
         string(name: 'NAME', defaultValue: 'runner', description: 'Image name')
     }
