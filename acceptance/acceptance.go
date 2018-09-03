@@ -124,7 +124,7 @@ func (flow AcceptanceFlow) ClusterSize(t *testing.T, expected int) AcceptanceFlo
 
 	var actual = 0
 	for idx := 0; idx < tryCount; idx++ {
-		actual = len(flow.client.GetCluster().GetMembers())
+		actual = len(flow.client.Cluster().GetMembers())
 		if actual != expected {
 			time.Sleep(tryTimeout)
 			log.Printf("Cluster size is not met, retrying actual %d, expected %d", actual, expected)
@@ -173,7 +173,7 @@ func (flow AcceptanceFlow) Client(config *config.Config) AcceptanceFlow {
 		return flow
 	}
 
-	members := hz_client.GetCluster().GetMembers()
+	members := hz_client.Cluster().GetMembers()
 	log.Printf("Number of members : %v", len(members))
 	flow.client = hz_client
 	flow.config = config
@@ -266,7 +266,7 @@ func (flow AcceptanceFlow) ExpectError(t *testing.T) AcceptanceFlow {
 }
 
 func (flow AcceptanceFlow) ExpectConnection(t *testing.T, expected int) AcceptanceFlow {
-	members := flow.client.GetCluster().GetMembers()
+	members := flow.client.Cluster().GetMembers()
 	assert.Equal(t, expected, len(members))
 	return flow
 }
