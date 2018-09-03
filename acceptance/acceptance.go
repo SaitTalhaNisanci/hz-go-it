@@ -153,9 +153,10 @@ func (flow AcceptanceFlow) ClusterDown() AcceptanceFlow {
 
 func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 	var clientConfig = hazelcast.NewConfig()
+	log.Println(flow.memberIp)
 	clientConfig.NetworkConfig().SetAddresses(flow.memberIp)
 	clientConfig.NetworkConfig().SetConnectionAttemptLimit(5)
-	clientConfig.NetworkConfig().SetConnectionTimeout(5)
+	clientConfig.NetworkConfig().SetConnectionTimeout(5*time.Second)
 	return flow.Client(clientConfig)
 }
 
@@ -385,7 +386,7 @@ func (flow AcceptanceFlow) ExpectDisconnect(t *testing.T, wg *sync.WaitGroup, li
 func (flow AcceptanceFlow) Percentile(t *testing.T, limitInMillis float64) AcceptanceFlow {
 	m, _ := stats.Percentile(flow.samples, 95)
 	assert.Condition(t, func() bool {
-		return (m <= limitInMillis * 1e6 && m > 0)
+		return m <= limitInMillis * 1e6 && m > 0
 	})
 	return flow
 }
