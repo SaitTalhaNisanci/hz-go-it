@@ -153,9 +153,10 @@ func (flow AcceptanceFlow) ClusterDown() AcceptanceFlow {
 
 func (flow AcceptanceFlow) DefaultClient() AcceptanceFlow {
 	var clientConfig = hazelcast.NewConfig()
+	log.Println(flow.memberIp)
 	clientConfig.NetworkConfig().SetAddresses(flow.memberIp)
 	clientConfig.NetworkConfig().SetConnectionAttemptLimit(5)
-	clientConfig.NetworkConfig().SetConnectionTimeout(5)
+	clientConfig.NetworkConfig().SetConnectionTimeout(5*time.Second)
 	return flow.Client(clientConfig)
 }
 
