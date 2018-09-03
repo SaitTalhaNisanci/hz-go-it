@@ -7,6 +7,7 @@ import (
 	"github.com/lucasjones/reggen"
 	"log"
 	"time"
+	"github.com/hazelcast/hazelcast-go-client/config/property"
 )
 
 func TestSingleMemberConnection(t *testing.T) {
@@ -81,7 +82,7 @@ func TestInvocationTimeout(t *testing.T) {
 	nc.SetConnectionTimeout(1 * time.Second)
 	nc.SetRedoOperation(true)
 	nc.SetConnectionAttemptLimit(2)
-	nc.SetInvocationTimeout(1 * time.Second)
+	config.SetProperty(property.InvocationTimeoutSeconds.Name(), "1")
 
 	flow = flow.Project().Up()
 	time.Sleep(10 * time.Second)
