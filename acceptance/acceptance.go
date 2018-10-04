@@ -38,7 +38,7 @@ type Store struct {
 type AcceptanceFlow struct {
 	options    Options
 	project    project.APIProject
-	client     hazelcast.Instance
+	client     hazelcast.Client
 	context    project.Context
 	createdMap core.Map
 	config     *config.Config
