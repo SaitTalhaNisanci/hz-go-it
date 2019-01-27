@@ -57,6 +57,7 @@ pipeline {
 
     post {
         always {
+            cleanWs deleteDirs: true
             sh "docker-compose -f ./acceptance/deployment.yaml down || true"
             sh "docker stop hz-go-it || true"
             sh "docker rm -f hz-go-it || true"
