@@ -49,7 +49,6 @@ pipeline {
 
         stage('Acceptance') {
             steps {
-                sh "docker-compose -f ./acceptance/deployment.yaml down || true"
                 sh "docker network create --attachable=true hz-go-it || true"
                 sh "docker run --network=hz-go-it --name=hz-go-it -v /home/jenkins/go:/go -v /var/run/docker.sock:/var/run/docker.sock ${params.NAME}:${env.BUILD_ID}"
             }
