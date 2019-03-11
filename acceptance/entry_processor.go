@@ -34,10 +34,9 @@ func (identifiedFactory *IdentifiedFactory) Create(id int32) serialization.Ident
 }
 
 func (entryProcessor *EntryProcessor) ReadData(input serialization.DataInput) error {
-	var err error
-	entryProcessor.value, err = input.ReadUTF()
+	entryProcessor.value = input.ReadUTF()
 	log.Println("Read : " + entryProcessor.value)
-	return err
+	return input.Error()
 }
 
 func (entryProcessor *EntryProcessor) WriteData(output serialization.DataOutput) error {
